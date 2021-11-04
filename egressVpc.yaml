@@ -1,0 +1,638 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description:  This template deploys an Transit VPC, with a pair of public and private subnets spread
+  across Availability Zones. It deploys an internet gateway, with a default
+  route on the public subnets. It deploys a pair of NAT gateways (one in each AZ-2),
+  and default routes for them in the private subnets.
+
+Parameters:
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names
+    Type: String
+    Default: example-network-egress
+
+  VpcCIDR:
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 10.149.48.0/24
+
+  PublicSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
+    Type: String
+    Default: 10.149.48.192/28
+
+  PublicSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
+    Type: String
+    Default: 10.149.48.208/28
+
+  PrivateSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
+    Type: String
+    Default: 10.149.48.0/26
+
+  PrivateSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 10.149.48.64/26
+
+  PrivateSubnet3CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 10.149.48.128/26
+
+  MasterAccountId:
+    Description: Master Account ID
+    Type: String
+    Default: 279161691969
+
+  OrganizationId:
+    Description: AWS Organization ID
+    Type: String
+    Default: o-90yuqlw7c6
+
+  NatGateway: 
+    Description: Create NatGateway (Yes or No)?.
+    Default: "Yes"
+    Type: String
+    AllowedValues:
+      - "Yes"
+      - "No"
+    ConstraintDescription: must specify Yes or No.
+
+  TransitGateway: 
+    Description: Create TransitGateway (Yes or No)?.
+    Default: "Yes"
+    Type: String
+    AllowedValues: 
+      - "Yes"
+      - "No"
+    ConstraintDescription: must specify Yes or No.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: "Network Configuration"
+      Parameters:
+      - EnvironmentName
+      - VpcCIDR
+      - NatGateway
+      - TransitGateway
+      - MasterAccountId
+      - OrganizationId
+    - Label:
+        default: "Public Network Configuration"
+      Parameters:
+      - PublicSubnet1CIDR
+      - PublicSubnet2CIDR
+    - Label:
+        default: "Private Network Configuration"
+      Parameters:
+      - PrivateSubnet1CIDR
+      - PrivateSubnet2CIDR
+      - PrivateSubnet3CIDR
+
+Conditions: 
+  CreateNgwResource: !Equals [ !Ref NatGateway, "Yes" ]
+  CreateTgwResource: !Equals [ !Ref TransitGateway, "Yes" ]
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+        - Key: IsUsedForDeploy
+          Value: "True"
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub subnet0-${AWS::Region}a-${EnvironmentName}-pub-01
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: !Ref PublicSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub subnet0-${AWS::Region}b-${EnvironmentName}-pub-02
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub subnet0-${AWS::Region}a-${EnvironmentName}-priv-01
+        - Key: IsUsedForDeploy
+          Value: "True"
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub subnet0-${AWS::Region}b-${EnvironmentName}-priv-02
+        - Key: IsUsedForDeploy
+          Value: "True"
+
+  PrivateSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 2, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnet3CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub subnet0-${AWS::Region}c-${EnvironmentName}-priv-03
+        - Key: IsUsedForDeploy
+          Value: "True"
+
+  NatGateway1EIP:
+    Type: AWS::EC2::EIP
+    Condition: CreateNgwResource
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+
+  NatGateway2EIP:
+    Type: AWS::EC2::EIP
+    Condition: CreateNgwResource
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+
+  NatGateway1:
+    Type: AWS::EC2::NatGateway
+    Condition: CreateNgwResource
+    Properties:
+      AllocationId: !GetAtt NatGateway1EIP.AllocationId
+      SubnetId: !Ref PublicSubnet1
+
+  NatGateway2:
+    Type: AWS::EC2::NatGateway
+    Condition: CreateNgwResource
+    Properties:
+      AllocationId: !GetAtt NatGateway2EIP.AllocationId
+      SubnetId: !Ref PublicSubnet2
+
+##PublicRoutes -->>>
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Routes
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  DefaultPublicRoute2:
+    Type: AWS::EC2::Route
+    DependsOn: TGWAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 10.148.0.0/16
+      TransitGatewayId: !Ref TransitGateway01
+
+  DefaultPublicRoute3:
+    Type: AWS::EC2::Route
+    DependsOn: TGWAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 10.149.0.0/16
+      TransitGatewayId: !Ref TransitGateway01
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+##PrivateRoutes -->>>
+
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Route 01
+
+  DefaultPrivateRoute1:
+    Type: AWS::EC2::Route
+    Condition: CreateNgwResource
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway1
+
+  DefaultPrivateRoute1Tgw:
+    Type: AWS::EC2::Route
+    DependsOn: TGWAttachment
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 10.148.0.0/16
+      TransitGatewayId: !Ref TransitGateway01
+
+  DefaultPrivateRoute1Tgw2:
+    Type: AWS::EC2::Route
+    DependsOn: TGWAttachment
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 10.149.0.0/16
+      TransitGatewayId: !Ref TransitGateway01
+
+  DefaultPrivateRoute1Tgw3:
+    Type: AWS::EC2::Route
+    DependsOn: TGWAttachment
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 10.0.0.0/8
+      TransitGatewayId: !Ref TransitGateway01 
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnet1
+
+  PrivateRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Route 02
+
+  DefaultPrivateRoute2:
+    Type: AWS::EC2::Route
+    Condition: CreateNgwResource
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway2
+
+  DefaultPrivateRoute2Tgw1:
+    Type: AWS::EC2::Route
+    DependsOn: TGWAttachment
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 10.148.0.0/16
+      TransitGatewayId: !Ref TransitGateway01
+
+  DefaultPrivateRoute2Tgw2:
+    Type: AWS::EC2::Route
+    DependsOn: TGWAttachment
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 10.149.0.0/16
+      TransitGatewayId: !Ref TransitGateway01
+
+  DefaultPrivateRoute2Tgw3:
+    Type: AWS::EC2::Route
+    DependsOn: TGWAttachment
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 10.0.0.0/8
+      TransitGatewayId: !Ref TransitGateway01 
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      SubnetId: !Ref PrivateSubnet2
+
+  PrivateRouteTable3:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Route 03
+
+  DefaultPrivateRoute3:
+    Type: AWS::EC2::Route
+    Condition: CreateNgwResource
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable3
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway1
+
+  DefaultPrivateRoute3Tgw1:
+    Type: AWS::EC2::Route
+    DependsOn: TGWAttachment
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable3
+      DestinationCidrBlock: 10.148.0.0/16
+      TransitGatewayId: !Ref TransitGateway01
+
+  DefaultPrivateRoute3Tgw3:
+    Type: AWS::EC2::Route
+    DependsOn: TGWAttachment
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable3
+      DestinationCidrBlock: 10.0.0.0/8
+      TransitGatewayId: !Ref TransitGateway01 
+
+  DefaultPrivateRoute3Tgw2:
+    Type: AWS::EC2::Route
+    DependsOn: TGWAttachment
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable3
+      DestinationCidrBlock: 10.149.0.0/16
+      TransitGatewayId: !Ref TransitGateway01
+
+  PrivateSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable3
+      SubnetId: !Ref PrivateSubnet3
+
+  TransitGateway01:
+    Type: AWS::EC2::TransitGateway
+    Condition: CreateTgwResource
+    Properties:
+      AmazonSideAsn: 65000
+      Description: "TGW EBT Transit"
+      AutoAcceptSharedAttachments: enable
+      DefaultRouteTableAssociation: enable
+      DnsSupport: enable
+      VpnEcmpSupport: enable
+      MulticastSupport: enable
+      Tags:
+      - Key: Name
+        Value: !Sub "${EnvironmentName}-TGW01"
+      - Key: Application
+        Value: !Ref 'AWS::StackId'
+      - Key: IsUsedForDeploy
+        Value: True
+
+  TGWFirewallRouteTable:
+    Type: AWS::EC2::TransitGatewayRouteTable
+    DependsOn: TransitGateway01
+    Condition: CreateTgwResource
+    Properties:
+      TransitGatewayId: !Ref TransitGateway01
+      Tags:
+      - Key: Name
+        Value: !Sub "Transit Route Table"
+
+  TGWFirewallRouteTableSpoke:
+    Type: AWS::EC2::TransitGatewayRouteTable
+    DependsOn: TransitGateway01
+    Condition: CreateTgwResource
+    Properties:
+      TransitGatewayId: !Ref TransitGateway01
+      Tags:
+      - Key: Name
+        Value: !Sub "Spoke Route Table"
+
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: F3
+            reason: "Required for Central Network Solution"
+    Condition: CreateTgwResource
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: "lambda-tgwchangertb"
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ec2:*'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - "arn:aws:logs:*:*:*"
+  AssociationTGWLambda:
+    Type: 'AWS::Lambda::Function'
+    DependsOn: TGWFirewallRouteTable
+    Condition: CreateTgwResource
+    Properties:
+      Code:
+        ZipFile:
+          !Sub |
+            import boto3
+            import json
+            import os
+            import cfnresponse
+            from botocore.exceptions import ClientError
+
+            def lambda_handler(event, context):
+                try:
+                    client = boto3.client('ec2')
+                    tgwId = os.environ['TGWID']
+                    tgwRouteTableId = os.environ['TRANSITRTID']
+                    response = client.modify_transit_gateway(
+                      TransitGatewayId=tgwId,
+                      Options={
+                          'AssociationDefaultRouteTableId': tgwRouteTableId,
+                          'PropagationDefaultRouteTableId': tgwRouteTableId
+                      },
+                    )
+                    print(response)
+                    print("Respond: SUCCESS")
+                    cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                    return
+                except ClientError as ex:
+                    print('Transit Gateway failed to associate new Route Table.  See the following error.')
+                    print(ex.response['Error']['Message'])
+                    print("Respond: FAILED")
+                    cfnresponse.send(event, context, cfnresponse.FAILED, ex)
+                    return
+      Environment:
+        Variables:
+          TGWID: !Ref TransitGateway01
+          TRANSITRTID: !Ref TGWFirewallRouteTable
+      Handler: "index.lambda_handler"
+      Timeout: 30
+      Role: !GetAtt 'LambdaRole.Arn'
+      Runtime: python3.7
+  Lambdatrigger:
+     Type: 'Custom::TGWChangeRTB'
+     DependsOn: AssociationTGWLambda
+     Properties:
+       ServiceToken: !GetAtt 'AssociationTGWLambda.Arn'
+
+  TGWAttachment:
+    Type: AWS::EC2::TransitGatewayAttachment
+    DependsOn: Lambdatrigger
+    Condition: CreateTgwResource
+    Properties:
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+        - !Ref PrivateSubnet3
+      TransitGatewayId: !Ref TransitGateway01
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: !Sub "${EnvironmentName}-Attach"
+
+  TGWFirewallRouteToEgress:
+    Type: AWS::EC2::TransitGatewayRoute
+    DependsOn: TGWAttachment
+    Condition: CreateTgwResource
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      TransitGatewayAttachmentId: !Ref TGWAttachment
+      TransitGatewayRouteTableId: !Ref TGWFirewallRouteTable
+
+  TGWFirewallPropagationToLocalNetwork:
+    Type: AWS::EC2::TransitGatewayRouteTablePropagation
+    DependsOn: TGWAttachment
+    Condition: CreateTgwResource
+    Properties: 
+      TransitGatewayAttachmentId: !Ref TGWAttachment
+      TransitGatewayRouteTableId: !Ref TGWFirewallRouteTableSpoke
+
+  myTGWNetworkResourceShare:
+    Type: "AWS::RAM::ResourceShare"
+    Condition: CreateTgwResource
+    DependsOn: TransitGateway01
+    Properties:
+      Name: "Example Network - TGW Share"
+      ResourceArns:
+        - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:transit-gateway/${TransitGateway01}"
+      Principals:
+        - !Sub arn:aws:organizations::${MasterAccountId}:organization/${OrganizationId}
+      Tags:
+        - Key: "Name"
+          Value: "Central-TGWSharing"
+
+Outputs:
+  MyVPC:
+    Description: A reference to the created VPC
+    Value: !Ref VPC
+    Export:
+      Name: TransitVpcId
+
+  PublicSubnets:
+    Description: A list of the public subnets
+    Value: !Join [ ",", [ !Ref PublicSubnet1, !Ref PublicSubnet2 ]]
+
+  PrivateSubnets:
+    Description: A list of the private subnets
+    Value: !Join [ ",", [ !Ref PrivateSubnet1, !Ref PrivateSubnet2, !Ref PrivateSubnet3 ]]
+
+  PublicSubnet1:
+    Description: A reference to the public subnet in the 1st Availability Zone
+    Value: !Ref PublicSubnet1
+    Export:
+      Name: TransitExPublicSubnet1
+
+  PublicSubnet2:
+    Description: A reference to the public subnet in the 2nd Availability Zone
+    Value: !Ref PublicSubnet2
+    Export:
+      Name: TransitExPublicSubnet2
+
+  PrivateSubnet1:
+    Description: A reference to the private subnet in the 1st Availability Zone
+    Value: !Ref PrivateSubnet1
+    Export:
+      Name: TransitExPrivateSubnet1
+
+  PrivateSubnet2:
+    Description: A reference to the private subnet in the 2nd Availability Zone
+    Value: !Ref PrivateSubnet2
+    Export:
+      Name: TransitExPrivateSubnet2
+
+  PrivateSubnet3:
+    Description: A reference to the private subnet in the 2nd Availability Zone
+    Value: !Ref PrivateSubnet3
+    Export:
+      Name: TransitExPrivateSubnet3
+
+  myTransitGateway:
+    Description: "My TransitGatewaId"
+    Value: !Ref TransitGateway01
+    Export:
+      Name: TransitGatewayExport
+
+  myTransitGatewayAttachment:
+    Description: "My Transit TGW Attachment"
+    Value: !Ref TGWAttachment
+    Export:
+      Name: TransitTGWAttachmentId
+
+  myTransitRouteTable:
+    Description: "Transit Route Table"
+    Value: !Ref TGWFirewallRouteTable
+    Export:
+      Name: TransitRouteTable
+
+  myTransitRouteTableSpoke:
+    Description: "Spoke Route Table"
+    Value: !Ref TGWFirewallRouteTableSpoke
+    Export:
+      Name: TGWFirewallRouteTableSpoke

@@ -1,0 +1,626 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description:  This template deploys a VPC for Inspection Network
+
+Parameters:
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names
+    Type: String
+    Default: network-inspection
+
+  VpcCIDR:
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 100.64.0.0/24
+
+  PrivateSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
+    Type: String
+    Default: 100.64.0.0/28
+
+  PrivateSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 100.64.0.16/28
+
+  PrivateSubnet3CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 100.64.0.32/28
+
+  PrivateSubnet4CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 100.64.0.208/28
+
+  PrivateSubnet5CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 100.64.0.224/28
+
+  PrivateSubnet6CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 100.64.0.240/28
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+        - Key: IsUsedForDeploy
+          Value: "True"
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ1)
+        - Key: IsUsedForDeploy
+          Value: "True"
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ2)
+        - Key: IsUsedForDeploy
+          Value: "True"
+
+  PrivateSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 2, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnet3CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ3)
+        - Key: IsUsedForDeploy
+          Value: "True"
+
+  PrivateSubnet4:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnet4CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} TGW Private Subnet (AZ1)
+        - Key: IsUsedForDeploy
+          Value: "True"
+
+  PrivateSubnet5:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnet5CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} TGW Private Subnet (AZ2)
+        - Key: IsUsedForDeploy
+          Value: "True"
+
+  PrivateSubnet6:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 2, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnet6CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} TGW Private Subnet (AZ3)
+        - Key: IsUsedForDeploy
+          Value: "True"
+
+##PrivateRoutes -->>>
+
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Routes 01
+
+  DefaultPrivateRoute1:
+    Type: AWS::EC2::Route
+    DependsOn: TGWAttachment
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      TransitGatewayId: !ImportValue TransitGatewayExport
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnet1
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnet2
+
+  PrivateSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnet3
+
+  PrivateRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Route TGW (AZ1)
+
+  PrivateSubnet4RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      SubnetId: !Ref PrivateSubnet4
+
+  DefaultPrivateRoute2:
+    Type: AWS::EC2::Route
+    DependsOn: NetworkFirewall
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      VpcEndpointId: !GetAtt 'Lambdatrigger.VpceId01'
+
+
+  PrivateRouteTable3:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Route TGW (AZ2)
+
+  PrivateSubnet5RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable3
+      SubnetId: !Ref PrivateSubnet5
+
+  DefaultPrivateRoute3:
+    Type: AWS::EC2::Route
+    DependsOn: NetworkFirewall
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable3
+      DestinationCidrBlock: 0.0.0.0/0
+      VpcEndpointId: !GetAtt 'Lambdatrigger.VpceId02'
+
+
+  PrivateRouteTable4:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Route TGW (AZ3)
+
+  PrivateSubnet6RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable4
+      SubnetId: !Ref PrivateSubnet6
+
+  DefaultPrivateRoute4:
+    Type: AWS::EC2::Route
+    DependsOn: NetworkFirewall
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable4
+      DestinationCidrBlock: 0.0.0.0/0
+      VpcEndpointId: !GetAtt 'Lambdatrigger.VpceId03'
+
+  NetworkFirewall:
+    Type: 'AWS::NetworkFirewall::Firewall'
+    Properties:
+      FirewallName: TransitNetworkFirewall
+      VpcId: !Ref VPC
+      SubnetMappings:
+        - SubnetId: !Ref PrivateSubnet1
+        - SubnetId: !Ref PrivateSubnet2
+        - SubnetId: !Ref PrivateSubnet3
+      FirewallPolicyArn:
+        Ref: FirewallPolicy
+      DeleteProtection: false
+      FirewallPolicyChangeProtection: false
+      SubnetChangeProtection: false
+      Tags:
+        - Key: Name
+          Value: TransitNetworkFirewall
+  FirewallPolicy:
+    Type: 'AWS::NetworkFirewall::FirewallPolicy'
+    Properties:
+      FirewallPolicyName: TransitFWPOL01
+      FirewallPolicy:
+        StatelessDefaultActions:
+          - 'aws:forward_to_sfe'
+        StatelessFragmentDefaultActions:
+          - 'aws:forward_to_sfe'
+        StatefulRuleGroupReferences:
+         - ResourceArn: !Ref InspectionStatefulRulegroup
+
+  InspectionStatefulRulegroup:
+    Type: 'AWS::NetworkFirewall::RuleGroup'
+    Properties:
+      RuleGroupName: NFW-Inspection-FWRule01
+      Type: STATEFUL
+      RuleGroup:
+        RulesSource:
+          StatefulRules:
+            - Action: PASS
+              Header: 
+                Destination: ANY
+                DestinationPort: 80
+                Source: ANY
+                SourcePort: ANY
+                Protocol: TCP
+                Direction: ANY
+              RuleOptions:
+                - Keyword: "sid:1"
+            - Action: PASS
+              Header: 
+                Destination: ANY
+                DestinationPort: 443
+                Source: ANY
+                SourcePort: ANY
+                Protocol: TCP
+                Direction: ANY
+              RuleOptions:
+                - Keyword: "sid:2"
+            - Action: PASS
+              Header: 
+                Destination: ANY
+                DestinationPort: 123
+                Source: ANY
+                SourcePort: ANY
+                Protocol: UDP
+                Direction: ANY
+              RuleOptions:
+                - Keyword: "sid:3"
+            - Action: PASS
+              Header: 
+                Destination: ANY
+                DestinationPort: 53
+                Source: ANY
+                SourcePort: ANY
+                Protocol: TCP
+                Direction: ANY
+              RuleOptions:
+                - Keyword: "sid:4"
+            - Action: PASS
+              Header: 
+                Destination: ANY
+                DestinationPort: 53
+                Source: ANY
+                SourcePort: ANY
+                Protocol: UDP
+                Direction: ANY
+              RuleOptions:
+                - Keyword: "sid:5"
+            - Action: PASS
+              Header: 
+                Destination: ANY
+                DestinationPort: ANY
+                Source: ANY
+                SourcePort: ANY
+                Protocol: ICMP
+                Direction: ANY
+              RuleOptions:
+                - Keyword: "sid:6"
+            - Action: DROP
+              Header: 
+                Destination: ANY
+                DestinationPort: ANY
+                Source: ANY
+                SourcePort: ANY
+                Protocol: IP
+                Direction: ANY
+              RuleOptions:
+                - Keyword: "sid:7"
+      Capacity: 1000
+      Description: Main Inspection Firewall Rule
+
+  TGWAttachment:
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties:
+      SubnetIds:
+        - !Ref PrivateSubnet4
+        - !Ref PrivateSubnet5
+        - !Ref PrivateSubnet6
+      TransitGatewayId: !ImportValue TransitGatewayExport
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: !Sub "${EnvironmentName}-Attach"
+
+  TGWSubnetAttachmentFirewallRouteTable1:
+    Type: AWS::EC2::TransitGatewayRouteTableAssociation
+    DependsOn: TGWAttachment
+    Properties:
+      TransitGatewayAttachmentId: !Ref TGWAttachment
+      TransitGatewayRouteTableId: !ImportValue TransitRouteTable
+
+  TGWFirewallRouteToInspection:
+      Type: AWS::EC2::TransitGatewayRoute
+      DependsOn: TGWAttachment
+      Properties:
+        DestinationCidrBlock: 0.0.0.0/0
+        TransitGatewayAttachmentId: !Ref TGWAttachment
+        TransitGatewayRouteTableId: !ImportValue TGWFirewallRouteTableSpoke
+
+# Enable Transit Gateway Appliance Mode Lambda Custom Resource:
+  TgwApplianceMode:
+    Type: AWS::Lambda::Function
+    DependsOn: TGWAttachment
+    Properties:
+      FunctionName: !Sub ${EnvironmentName}-tgw-set-appliancemode
+      Handler: "index.handler"
+      Role: !GetAtt LambdaRole.Arn
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          import json
+          import logging
+          def handler(event, context):
+              logger = logging.getLogger()
+              logger.setLevel(logging.INFO)
+              responseData = {}
+              responseStatus = cfnresponse.FAILED
+              logger.info('Received event: {}'.format(json.dumps(event)))
+              if event["RequestType"] == "Delete":
+                  responseStatus = cfnresponse.SUCCESS
+                  cfnresponse.send(event, context, responseStatus, responseData)
+              if event["RequestType"] == "Create":
+                  try:
+                      TgwInspectionVpcAttachmentId = event["ResourceProperties"]["TgwInspectionVpcAttachmentId"]
+                      ApplianceMode = event["ResourceProperties"]["ApplianceMode"]
+                  except Exception as e:
+                      logger.info('Key retrieval failure: {}'.format(e))
+                  try:
+                      ec2 = boto3.client('ec2')
+                  except Exception as e:
+                      logger.info('boto3.client failure: {}'.format(e))
+                  try:
+                      ec2.modify_transit_gateway_vpc_attachment(
+                          TransitGatewayAttachmentId = TgwInspectionVpcAttachmentId,
+                          Options = {
+                            'Ipv6Support': 'disable',
+                            'ApplianceModeSupport': ApplianceMode
+                          }
+                      )
+                      TgwResponse = ec2.describe_transit_gateway_vpc_attachments(
+                          TransitGatewayAttachmentIds=[TgwInspectionVpcAttachmentId]
+                      )
+                      ApplianceModeStatus = TgwResponse['TransitGatewayVpcAttachments'][0]['Options']['ApplianceModeSupport']
+                  except Exception as e:
+                      logger.info('ec2.modify/describe_transit_gateway_vpc_attachment: {}'.format(e))
+
+                  responseData['ApplianceModeStatus'] = ApplianceModeStatus
+                  responseStatus = cfnresponse.SUCCESS
+                  cfnresponse.send(event, context, responseStatus, responseData)
+      Runtime: python3.8
+      Timeout: 30
+
+  ApplianceModeEnabled:
+    Type: Custom::ModifyTransitGatewayVpcAttachment
+    Properties:
+      ServiceToken: !GetAtt TgwApplianceMode.Arn
+      TgwInspectionVpcAttachmentId: !Ref TGWAttachment
+      ApplianceMode: enable
+
+  VpceGetIDs:
+      Type: AWS::Lambda::Function
+      DependsOn: NetworkFirewall
+      Properties:
+        Code:
+          ZipFile: |
+            import json
+            import boto3
+            import logging
+            import urllib3
+            http = urllib3.PoolManager()
+
+            logger = logging.getLogger(__name__)
+            logging.getLogger().setLevel(logging.INFO)
+
+            SUCCESS = "SUCCESS"
+            FAILED = "FAILED"
+
+            ec2client = boto3.client('ec2')
+
+            def lambda_handler(event, context):
+                logger.info('Event: %s' % json.dumps(event))
+                responseData={}
+                try:
+                    if event['RequestType'] == 'Delete':
+                        print("Request Type:",event['RequestType'])
+                        print("Delete Request - Nothing to delete")
+                    elif event['RequestType'] == 'Create' or event['RequestType'] == 'Update':
+                        print("Request Type:",event['RequestType'])
+                        VPCEAZ1=event['ResourceProperties']['VPCEAZ1']
+                        VPCEAZ2=event['ResourceProperties']['VPCEAZ2']
+                        VPCEAZ3=event['ResourceProperties']['VPCEAZ3']
+                        VpceId01=get_vpceaz1(VPCEAZ1)
+                        VpceId02=get_vpceaz2(VPCEAZ2)
+                        VpceId03=get_vpceaz3(VPCEAZ3)
+                        responseData={'VpceId01':VpceId01,'VpceId02':VpceId02,'VpceId03':VpceId03}
+                    responseStatus = 'SUCCESS'
+                except Exception as e:
+                    print('Failed to process:', e)
+                    responseStatus = 'FAILURE'
+                    responseData = {'Failure': 'Check Logs.'}
+                send(event, context, responseStatus, responseData)
+
+            def get_vpceaz1(VPCEAZ1):
+                try:
+                    response = ec2client.describe_vpc_endpoints(
+                        Filters=[ {
+                        'Name' : 'vpc-endpoint-type',
+                        'Values' : ['GatewayLoadBalancer']
+                            }
+                        ]
+                    )
+                    az1VpceId = response['VpcEndpoints'][0]['VpcEndpointId']
+                    return az1VpceId
+
+                except Exception as ex:
+                    logger.error(ex)
+                    traceback.print_tb(ex.__traceback__)
+                    raise
+
+            def get_vpceaz2(VPCEAZ2):
+                try:
+                    response = ec2client.describe_vpc_endpoints(
+                        Filters=[ {
+                        'Name' : 'vpc-endpoint-type',
+                        'Values' : ['GatewayLoadBalancer']
+                            }
+                        ]
+                    )
+                    az2VpceId = response['VpcEndpoints'][1]['VpcEndpointId']
+                    return az2VpceId
+
+                except Exception as ex:
+                    logger.error(ex)
+                    traceback.print_tb(ex.__traceback__)
+                    raise
+
+            def get_vpceaz3(VPCEAZ3):
+                try:
+                    response = ec2client.describe_vpc_endpoints(
+                        Filters=[ {
+                        'Name' : 'vpc-endpoint-type',
+                        'Values' : ['GatewayLoadBalancer']
+                            }
+                        ]
+                    )
+                    az3VpceId = response['VpcEndpoints'][2]['VpcEndpointId']
+                    return az3VpceId
+
+                except Exception as ex:
+                    logger.error(ex)
+                    traceback.print_tb(ex.__traceback__)
+                    raise
+
+            def send(event, context, responseStatus, responseData, physicalResourceId=None, noEcho=False):
+                responseUrl = event['ResponseURL']
+                print(responseUrl)
+                responseBody = {'Status': responseStatus,
+                                'Reason': 'See the details in CloudWatch Log Stream: ' + context.log_stream_name,
+                                'PhysicalResourceId': physicalResourceId or context.log_stream_name,
+                                'StackId': event['StackId'],
+                                'RequestId': event['RequestId'],
+                                'LogicalResourceId': event['LogicalResourceId'],
+                                'Data': responseData}
+                json_responseBody = json.dumps(responseBody)
+                print("Response body:\n" + json_responseBody)
+                headers = {
+                    'content-type' : '',
+                    'content-length' : str(len(json_responseBody))
+                }
+                try:
+                    response = http.request('PUT', responseUrl, headers=headers, body=json_responseBody)
+                    print("Status code:", response.status)
+                except Exception as e:
+                    print("send(..) failed http.request(..):", e)
+        FunctionName: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:NFW-vpceNFGetIds'
+        Handler: "index.lambda_handler"
+        Timeout: 30
+        Role: !GetAtt 'LambdaRole.Arn'
+        Runtime: python3.7
+  Lambdatrigger:
+     Type: 'Custom::GetVPCeIds'
+     Properties:
+       ServiceToken: !GetAtt 'VpceGetIDs.Arn'
+       VPCEAZ1: !Ref VpceGetIDs
+       VPCEAZ2: !Ref VpceGetIDs
+       VPCEAZ3: !Ref VpceGetIDs
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: "lambda-logs"
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ec2:Describe*'
+                  - ec2:ModifyTransitGatewayVpcAttachment
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - "arn:aws:logs:*:*:*"
+Outputs:
+  MyVPC:
+    Description: A reference to the created VPC
+    Value: !Ref VPC
+    Export:
+      Name: InpectionVpcId
+
+  myTransitGatewayAttachment:
+    Description: "My Egress TGW Attachment"
+    Value: !Ref TGWAttachment
+    Export:
+      Name: InspectionTGWAttachmentId
+
+  myNFWEndpointAZ1:
+    Description: "My NetworkFirewall VPCe AZ1"
+    Value: !GetAtt 'Lambdatrigger.VpceId01'
+    Export:
+      Name: NfwVPCeAz1
+
+  myNFWEndpointAZ2:
+    Description: "My NetworkFirewall VPCe AZ2"
+    Value: !GetAtt 'Lambdatrigger.VpceId02'
+    Export:
+      Name: NfwVPCeAz2
+
+  NetworkFirewallRuleGroupArn:
+    Description: "Network Firewall Inspection Group ARN"
+    Value: !GetAtt 'InspectionStatefulRulegroup.RuleGroupArn'
+    Export:
+      Name: NetworkFirewallRuleGroupArn

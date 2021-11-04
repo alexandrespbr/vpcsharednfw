@@ -1,0 +1,40 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Cross-Account Transit Role'
+Parameters:
+  AccountId:
+    Type: String
+    Default: 123456789101
+    Description: Network Account Id
+
+Resources:  
+  TransitAccountRole:
+    Type: AWS::IAM::Role
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: F3
+            reason: "Required for Network Account"
+          - id: W11
+            reason: "Required for Network Account"            
+    Properties:
+      RoleName: TransitAccountRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            AWS: !Sub arn:aws:iam::${AccountId}:root
+          Action: sts:AssumeRole
+      Path: "/"
+      Policies:
+        - PolicyName: "TransitNameChanges"
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ec2:*'
+                  - 'lambda:*'
+                  - 'ssm:*'
+                  - 'logs:*'
+                Resource: '*'
